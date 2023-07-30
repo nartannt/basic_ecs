@@ -1,64 +1,33 @@
-use std::cell::RefCell;
-use std::cell::RefMut;
 
-pub struct Wrapper<Id, Content: ?Sized> {
-    pub id: Id,
-    pub content: RefCell<Content>
+// what i want the interface to look like (approximately)
+// world.components.get_XX_component(entity.id())
+// world.components.get_mut_XX_component(entity.id())
+
+pub struct Id {
+    id: u64
 }
 
-#[macro_export]
-macro_rules! components {
-    // we could want a dependency between the id type and the component TODO when needed
-    ($id_type: ty, $($component_name:ident : $component_type: ty),*) => {
-
-        pub struct Components {
-            $(
-                pub $component_name: Vec<Wrapper<$id_type, $component_type>>,
-            )*
-        }
-
-        // for now we will keep a single unique component of each type per collection
-        pub struct ComponentCollection {
-            $(
-                pub $component_name: Option<$id_type>,
-            )*
-        }
-
-        impl Components {
-            $(
-            pub fn $component_name(&mut self, id_opt: Option<$id_type>) -> Option<RefMut<$component_type>> {
-                let res = match id_opt {
-                    None => None,
-                    Some(id) => {
-                        let res = self.$component_name.iter().
-                            find(|w| w.id == id).
-                                and_then(|w| Some(w.content.borrow_mut()));
-                        return res;
-                    }
-                };
-                return res;
-            }
-            )*
-        }
-
-    }
+pub trait ComponentTrait {
+    fn id(&self) -> Id; 
 }
 
+pub enum ComponentType {
+    EmptyComponent
+}
 
-components!(u64, foo: i32, bar: i64, boo: Box<str>);
+pub trait ComponentSet {
+    fn new() -> Self;
+    fn add(&mut self, component: dyn ComponentTrait) -> ();
+    fn remove(&mut self, component_type: ComponentType) -> ();
+    fn get(&self, component_type: ComponentType) -> & dyn ComponentTrait;
+    fn get_mut(&mut self, component_type: ComponentType) -> &mut dyn ComponentTrait;
+}
 
-pub fn test() {
-    let test_val = Wrapper {id: 0, content: RefCell::new(1515)};
-    let mut all_components = Components {
-        foo: Vec::new(),
-        bar: vec![test_val],
-        boo: Vec::new()
-    };
-    let mut get_int = all_components.bar(Some(0)).unwrap();
-    
-    *get_int = 1444;
+pub trait EntityTrait {
+    fn foo(&self) -> ();
+}
 
-    // what the interface is currently projected to look like
-    //components.graphic_component(go.components.graphic_component).unwrap().load_model(&display);
-    print!("{}", *get_int);
+pub struct World {
+    components : Vec<Option<Box<dyn ComponentTrait>>>,
+    entities : Vec<Option<Box<dyn EntityTrait>>>,
 }
