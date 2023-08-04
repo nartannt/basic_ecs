@@ -1,49 +1,47 @@
 use std::collections::HashMap;
+use std::any::Any;
+use std::any::TypeId;
+use std::hash::Hash;
 
 // what i want the interface to look like (approximately)
 // world.components.get_XX_component(entity.id())
 // world.components.get_mut_XX_component(entity.id())
 //
 // what it currently is set out to look like
-// world.components.get(component_type, entity.id())
-// world.components.get_mut(component_type, entity.id())
+// world.components.get::<Component_type(entity.id())
+// world.components.get_mut::<Component_type>(entity.id())
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Id {
-    id: u64
+    pub id: u64
 }
 
-pub trait ComponentTrait {
-    fn parent_id(&self) -> Id; 
+pub trait ComponentTrait: Any {
 }
 
-#[derive(PartialEq, Eq, Clone, Hash)]
-pub enum ComponentType {
-    EmptyComponent
-}
-
+impl<T: Any> ComponentTrait for T {}
 
 pub struct ComponentSet {
-    set: HashMap<ComponentType, Box<dyn ComponentTrait>>
+    set: HashMap<TypeId, Box<dyn ComponentTrait>>
 }
 
 impl ComponentSet {
-    fn new() -> Self {
+    pub fn new() -> Self {
         ComponentSet {
             set: HashMap::new()
         }
     }
-    fn add(&mut self, component_type: ComponentType, component: Box<dyn ComponentTrait>) -> () {
-        self.set.insert(component_type, component);
+    pub fn add<C: ComponentTrait>(&mut self, component: Box<dyn ComponentTrait>) -> () {
+        self.set.insert(TypeId::of::<C>(), component);
     }
-    fn remove(&mut self, component_type: ComponentType) -> () {
-        self.set.remove(&component_type);
+    pub fn remove<C: ComponentTrait>(&mut self) -> () {
+        self.set.remove(&TypeId::of::<C>());
     }
-    fn get(&self, component_type: ComponentType) -> Option<&Box<dyn ComponentTrait>> {
-        return self.set.get(&component_type);
+    pub fn get<C:ComponentTrait>(&self) -> Option<&Box<dyn ComponentTrait>> {
+        return self.set.get(&TypeId::of::<C>());
     }
-    fn get_mut(&mut self, component_type: ComponentType) -> Option<&mut Box<dyn ComponentTrait>> {
-        return self.set.get_mut(&component_type);
+    pub fn get_mut<C: ComponentTrait>(&mut self) -> Option<&mut Box<dyn ComponentTrait>> {
+        return self.set.get_mut(&TypeId::of::<C>());
     }
 }
 
@@ -52,8 +50,8 @@ pub trait EntityTrait {
 }
 
 pub struct World {
-    components : HashMap<Id, ComponentSet>,
-    entities : HashMap<Id, Box<dyn EntityTrait>>,
+    pub components : HashMap<Id, ComponentSet>,
+    pub entities : HashMap<Id, Box<dyn EntityTrait>>,
 }
 
 impl World {
@@ -64,19 +62,20 @@ impl World {
         }
     }
 
-    pub fn add_entity(&mut self, entity: Box<dyn EntityTrait>) -> () {
-        self.entities.insert(entity.id(), entity);
+    pub fn add_entity(&mut self, entity_id: Id) -> () {
+        //self.entities.insert(entity.id(), entity);
+        self.components.insert(entity_id, ComponentSet::new());
     }
 
-    pub fn remove_entity(&mut self, entity_id: Id) -> () {
-        self.entities.remove(&entity_id);
+    /*pub fn remove_entity(&mut self, entity_id: Id) -> () {
+        //self.entities.remove(&entity_id);
+    }*/
+
+    pub fn add_component<C: ComponentTrait>(&mut self, entity_id: Id, component: Box<dyn ComponentTrait>) {
+        self.components.get_mut(&entity_id).unwrap().add::<C>(component);
     }
 
-    pub fn add_component(&mut self, entity_id: Id, component_type: ComponentType, component: Box<dyn ComponentTrait>) {
-        self.components.get_mut(&entity_id).unwrap().add(component_type, component);
-    }
-
-    pub fn remove_component(&mut self, entity_id: Id, component_type: ComponentType) -> () {
-        self.components.get_mut(&entity_id).unwrap().remove(component_type);
+    pub fn remove_component<C: ComponentTrait>(&mut self, entity_id: Id) -> () {
+        self.components.get_mut(&entity_id).unwrap().remove::<C>();
     }
 }
